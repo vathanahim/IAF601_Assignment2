@@ -1,0 +1,142 @@
+############## ISM 645/IAF 601 Predictive Analytics ##########################
+#=============================================================================
+#============ Assignment 2. Data Exploration and Visualization ===============
+#=============================================================================
+
+######### Due: Oct 19, 11:59pm
+
+
+library(tidyverse)
+library(openxlsx)
+
+## (1) Import "MSA_M2019_dl.xlsx" and inspect the data.
+
+
+```{r}
+data = read.xlsx('oesm19ma/MSA_M2019_dl.xlsx')
+data
+```
+
+
+## (2) Filter the observations of which o_group is "major".
+
+```{r}
+q2 = data %>%
+                  filter(o_group=='major')
+q2
+```
+
+
+
+## (3) Select area_title, occ_title, jobs_1000 (employment per 1,000 people).
+
+```{r}
+q3 = q2 %>%
+        select(area_title, occ_title, jobs_1000)
+q3
+```
+
+
+
+
+## (4) Convert  the data type of jobs_1000 as numeric
+##     Hint: Use as.numeric()
+
+```{r}
+q4 = q3 %>%
+        mutate(jobs_1000 = as.numeric(jobs_1000))
+q4
+```
+
+
+## (5) Make each occupation as each variable (a city is the unit of observation).
+##     Hint: Spread the occupation titles into different columns.
+
+
+```{r}
+q5 = spread(q4,occ_title,jobs_1000)
+q5
+```
+
+
+
+## (6) area_title consists of city name and state name (Greensboro-High Point, NC).
+##     Split area_title into city and state, based on ",".
+##     Apply str_trim() into city and state variables to remove any white spaces.
+
+```{r}
+q6 = separate(q5, area_title, into=c("city","state"), sep=",")
+q6 = q6 %>% mutate(city = str_trim(city), state=str_trim(state))
+q6
+      
+```
+
+
+
+## (7) Cluster the U.S. cities based on the occupational employment composition. You determine the number of clusters.
+##     If needed, drop all observations with missing values.
+```{r}
+colnames(q6)
+```
+
+
+```{r}
+#how jobs per 10000 for each occupation deviations from the centroids (same clusters means they're grouped together by job per 1000 by the choosen centroids)
+q7 = q6 %>% drop_na()
+kmeans_result = kmeans(q7[,3:24], centers=4, iter.max=10, nstart=25)
+q7 = q7%>% mutate(cluster = kmeans_result$cluster)
+```
+
+```{r}
+q7
+```
+
+
+
+## (8) Create a scatter plot with Production Occupations on the x axis and Management Occupations on the y axis.
+##     Color the observations based on the clusters revealed in the previous question.
+##     Hint: When you specify a variable name with more than one word, it should be enclosed with ` ` (not ' ') (e.g., `Management Occupations`).
+
+
+```{r}
+q8= q7 %>% 
+  group_by(cluster)
+plot = ggplot(q8, aes(x=`Production Occupations`, y=`Management Occupations`))+
+  geom_point(aes(color=as.factor(cluster)))
+plot
+
+```
+
+
+
+## (9) Add title to the plot and data label (city names) only to NC cities (the state is either "NC" or "NC-SC").
+##     Note that visual details will not be accounted for grading.
+
+library(ggrepel)
+
+
+```{r}
+q9 = plot + 
+      labs(title = "Cluster Analysis of Productions and Management Occupations Employement", color= "Cluster")+
+      geom_text_repel(aes(label=city), force=10, min.segment.length = unit(1, 'lines'),nudge_y = 8, 
+                  data = subset(q8, (cluster==1 | cluster==2 | cluster==3 | cluster==4) & (state=='NC'|state=='NC-SC')))
+q9
+```
+
+
+
+## (10) Investigate other occupations besides management and production. 
+##      Briefly discuss the NC cities' occupational structures below (Must use the comments).
+  
+```{r}
+q10 = q7 %>% group_by(cluster)
+plot = ggplot(q10, aes(x=`Farming, Fishing, and Forestry Occupations`, y=`Life, Physical, and Social Science Occupations`)) + geom_point(aes(color=as.factor(cluster))) +
+  labs(title = "Farming, Fishing and Forestry vs Life,Physical, and Social Sciences Occupations", color="cluster")+
+  geom_text_repel(aes(label=city), force=10, min.segment.length = unit(1,'lines'), nudge_y = 8,
+                  data=subset(q10, (cluster==1 | cluster==2 | cluster==3 | cluster==4)&(state=='NC'|state=='NC-SC')))
+plot
+```
+<!-- Based on the cluster analysis on occupations of "Farming, Fishing, and Forestry Occupations" vs.  -->
+<!-- "Life,Physical, and Social SCience Occupations", we can determine that the majority of occupations in major cities in NC and NC-SC are mostly in the "Life,Physical, and Social SCience Occupations". The graphs show that the majority of jobs per 1000 employement belong in the "Life,Physical, and Social SCience Occupations" category with evidence that 3 out of the 4 clusters belong to that occupation for each different city. Although difficult to tell from the graph, we can also aproximate that Durham-Chapel Hill and Greenville have the most jobs per 1000 employment for the "Life,Physical, and Social SCience Occupations" in North Carolina. Additionally, Durhman-Chapel Hill is one of the leaders in the United States cities with most jobs in the "Life,Physical, and Social SCience Occupations" industry. Subsequetly, based on the clusters above we can also determine that the "Farming, Fishing, and Forestry Occupations" industry is not popular in NC because we are unable to determine its city label in graph.  -->
+  
+  
